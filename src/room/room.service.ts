@@ -105,11 +105,19 @@ export class RoomService {
     });
     return this.buildRoomSummaryResponse(roomUpdated);
   }
+  
   async getPageByRoomId(
     getPageRequest: GetPageRequest,
   ): Promise<GetPageResponse | null> {
+    console.log(JSON.stringify(getPageRequest));
+    console.log('DTO:: ', JSON.stringify(getPageRequest));
+    const roomIdParse = Number.parseInt(getPageRequest.roomId.toString(), 10);
+    const pageSizeParse = Number.parseInt(
+      getPageRequest.pageSize.toString(),
+      10,
+    );
     const targetRoom = await this.prismaService.room.findUnique({
-      where: { id: getPageRequest.roomId },
+      where: { id: roomIdParse },
       select: { roomNumber: true },
     });
     if (!targetRoom) {
@@ -121,12 +129,13 @@ export class RoomService {
     const countBefore = await this.prismaService.room.count({
       where: { roomNumber: { lt: targetRoom.roomNumber } },
     });
-    const page = Math.floor(countBefore / getPageRequest.pageSize) + 1;
+    const page = Math.floor(countBefore / pageSizeParse) + 1;
     return {
-      roomId: getPageRequest.roomId,
+      roomId: roomIdParse,
       page,
     };
   }
+
   private buildRoomSummaryResponse(data: Room): RoomSummaryResponse {
     return {
       id: data.id,
