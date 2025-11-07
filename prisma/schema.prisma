@@ -1,0 +1,331 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model Role {
+  id          Int       @id @default(autoincrement())
+  roleName    RoleName
+  description String?
+  createdAt   DateTime  @default(now())
+  accounts    Account[]
+
+  @@unique([roleName])
+  @@map("roles")
+}
+
+model Account {
+  id                  Int                   @id @default(autoincrement())
+  name                String                @default("Unknown")
+  userName            String
+  password            String
+  status              AccountStatus
+  roleId              Int
+  role                Role                  @relation(fields: [roleId], references: [id])
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+  deletedAt           DateTime?
+  AccountNotification AccountNotification[]
+  PushSubscription    PushSubscription[]
+
+  @@unique([userName])
+  @@map("accounts")
+}
+
+model PushSubscription {
+  id        Int           @id @default(autoincrement())
+  accountId Int
+  endpoint  String        @db.Text
+  p256dh    String        @db.Text
+  auth      String        @db.Text
+  createdAt DateTime      @default(now())
+  updatedAt DateTime?
+  status    AccountStatus @default(ACTIVE)
+  account   Account       @relation(fields: [accountId], references: [id])
+
+  @@unique([endpoint(length: 300)])
+  @@map("push_subscriptions")
+}
+
+model Tenant {
+  id          Int       @id @default(autoincrement())
+  fullName    String
+  gender      Gender
+  occupation  String?
+  dateOfBirth DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  @@map("tenants")
+}
+
+model Room {
+  id                      Int                       @id @default(autoincrement())
+  roomNumber              String
+  capacity                Int
+  currentPeople           Int
+  status                  RoomStatus
+  createdAt               DateTime                  @default(now())
+  updatedAt               DateTime                  @updatedAt
+  deletedAt               DateTime?
+  accessLogs              AccessLog[]
+  VehicleEntryLog         VehicleEntryLog[]
+  RoomVehicleLicensePlate RoomVehicleLicensePlate[]
+
+  @@unique([roomNumber])
+  @@index([roomNumber])
+  @@map("rooms")
+}
+
+model AccessLog {
+  id           Int          @id @default(autoincrement())
+  roomId       Int
+  note         String?
+  userName     String
+  inCount      Int
+  outCount     Int
+  unlockMethod UnlockMethod
+  logDate      DateTime
+  createdAt    DateTime     @default(now())
+  room         Room         @relation(fields: [roomId], references: [id])
+
+  @@map("access_logs")
+}
+
+model Notification {
+  id                  Int                   @id @default(autoincrement())
+  title               String
+  content             String
+  type                NotificationType
+  sentAt              DateTime              @default(now())
+  AccountNotification AccountNotification[]
+
+  @@map("notifications")
+}
+
+model AccountNotification {
+  id             Int          @id @default(autoincrement())
+  notificationId Int
+  accountId      Int
+  isRead         Boolean      @default(false)
+  notification   Notification @relation(fields: [notificationId], references: [id])
+  account        Account      @relation(fields: [accountId], references: [id])
+
+  @@map("account_notifications")
+}
+
+model LogEventUnlock {
+  id          Int               @id @default(autoincrement())
+  recordType  Int
+  success     Int
+  keyboardPwd String?
+  userName    String
+  lockDate    BigInt
+  serverDate  BigInt
+  createdDate DateTime
+  status      EventUnlockStatus
+
+  @@index([userName])
+  @@map("log_events")
+}
+
+model LogSensor {
+  id            Int             @id @default(autoincrement())
+  inCount       Int
+  outCount      Int
+  note          String?
+  status        LogSensorStatus
+  lastTimestamp BigInt
+  receivedDate  DateTime
+
+  @@map("log_sensors")
+}
+
+model Vehicle {
+  id                  Int                   @id @default(autoincrement())
+  brand               String
+  chassisNumber       String                @unique
+  engineNumber        String
+  color               String
+  registeredDate      DateTime              @default(now())
+  status              VehicleStatus         @default(ACTIVE)
+  updatedAt           DateTime              @updatedAt
+  VehicleLicensePlate VehicleLicensePlate[]
+
+  @@map("vehicles")
+}
+
+model LicensePlate {
+  licensePlateNumber  String                @id
+  status              LicensePlateStatus    @default(REGISTERED)
+  registeredAt        DateTime              @default(now())
+  VehicleLicensePlate VehicleLicensePlate[]
+
+  @@map("license_plates")
+}
+
+model VehicleLicensePlate {
+  id                      Int                       @id @default(autoincrement())
+  vehicleId               Int
+  licensePlateNumber      String
+  status                  VehicleLicensePlateStatus @default(ACTIVE)
+  assignedAt              DateTime                  @default(now())
+  vehicle                 Vehicle                   @relation(fields: [vehicleId], references: [id])
+  licensePlateRel         LicensePlate              @relation(fields: [licensePlateNumber], references: [licensePlateNumber])
+  RoomVehicleLicensePlate RoomVehicleLicensePlate[]
+
+  @@unique([vehicleId, licensePlateNumber])
+  @@index([licensePlateNumber])
+  @@map("vehicle_license_plates")
+}
+
+model RoomVehicleLicensePlate {
+  id                    Int                 @id @default(autoincrement())
+  roomId                Int
+  vehicleLicensePlateId Int
+  status                VehicleRoomStatus   @default(ACTIVE)
+  assignedAt            DateTime            @default(now())
+  room                  Room                @relation(fields: [roomId], references: [id])
+  vehicleLicensePlate   VehicleLicensePlate @relation(fields: [vehicleLicensePlateId], references: [id])
+
+  @@unique([roomId, vehicleLicensePlateId])
+  @@map("room_vehicle_license_plates")
+}
+
+model VehicleEntryLog {
+  id                 Int            @id @default(autoincrement())
+  roomId             Int
+  licensePlateNumber String
+  brand              String
+  chassisNumber      String
+  vehicleType        VehicleType    @default(GAS)
+  color              String
+  direction          entryDirection
+  note               String?
+  logDate            DateTime
+  createdAt          DateTime       @default(now())
+  room               Room           @relation(fields: [roomId], references: [id])
+
+  @@map("vehicle_entry_logs")
+}
+
+model Setting {
+  id          Int       @id @default(autoincrement())
+  name        String
+  key         String
+  value       String
+  description String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime?
+
+  @@unique([key])
+  @@map("settings")
+}
+
+enum RoleName {
+  USER
+  SECURITY
+  MANAGER
+  ADMIN
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum RoomStatus {
+  AVAILABLE
+  OCCUPIED
+  RESERVED
+  MAINTENANCE
+  CLEANING
+  UNAVAILABLE
+}
+
+enum AccountStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum NotificationType {
+  ALERT
+  EVENT
+  ACCESS
+  CAPACITY
+  SECURITY
+  SYSTEM_ANNOUNCEMENT
+  NEW_MESSAGE
+}
+
+enum LogSensorStatus {
+  UNCONFIRMED
+  PENDING
+  CONFIRMED
+}
+
+enum EventUnlockStatus {
+  PENDING
+  CONFIRMED
+}
+
+enum UnlockMethod {
+  CARD
+  FINGERPRINT
+  PASSWORD
+}
+
+enum VehicleStatus {
+  ACTIVE
+  INACTIVE
+  STOLEN
+}
+
+enum LicensePlateStatus {
+  ACTIVE
+  INACTIVE
+  REGISTERED
+  REVOKED
+  LOST
+  STOLEN
+  EXPIRED
+}
+
+enum VehicleLicensePlateStatus {
+  PENDING
+  ACTIVE
+  INACTIVE
+  REVOKED
+  TRANSFERRED
+  LOST
+}
+
+enum VehicleRoomStatus {
+  PENDING
+  ACTIVE
+  INACTIVE
+  EXPIRED
+  BLACKLISTED
+}
+
+enum entryDirection {
+  IN
+  OUT
+}
+
+enum VehicleType {
+  ELEC
+  GAS
+}
